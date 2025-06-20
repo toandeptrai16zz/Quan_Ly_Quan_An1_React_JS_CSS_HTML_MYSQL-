@@ -137,7 +137,7 @@ const ProductCard = ({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Ghi chú (ít cay, không hành...)"
+          placeholder="Ghi chú (...)"
           style={{
             width: '100%',
             padding: '8px',

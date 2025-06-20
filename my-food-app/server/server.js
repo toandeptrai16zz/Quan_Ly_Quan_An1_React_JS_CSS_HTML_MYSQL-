@@ -126,6 +126,133 @@ app.get('/api/revenue', async (req, res) => {
   }
 });
 
+// ==========================
+// API KẾT CA DOANH THU
+// ==========================
+
+// Kết ca thủ công (POST /api/shifts/close)
+app.post('/api/shifts/close', async (req, res) => {
+  try {
+    // Lấy ngày hôm nay (theo múi giờ VN)
+    const now = new Date();
+    const vnDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const today = vnDate.toISOString().slice(0, 10);
+
+    // Kiểm tra đã kết ca chưa
+    const [exist] = await pool.query('SELECT * FROM shifts WHERE shift_date = ?', [today]);
+    if (exist.length > 0) {
+      return res.status(400).json({ error: 'Đã kết ca ngày hôm nay!' });
+    }
+
+    // Tính tổng doanh thu hôm nay
+    const [rows] = await pool.query(
+      `SELECT 
+        SUM(total) as total,
+        SUM(CASE WHEN method='cash' OR method='tiền mặt' THEN total ELSE 0 END) as cash,
+        SUM(CASE WHEN method='bank' OR method='chuyển khoản' THEN total ELSE 0 END) as bank
+      FROM payments
+      WHERE DATE(time) = ?`, [today]
+    );
+    const { total = 0, cash = 0, bank = 0 } = rows[0] || {};
+
+    // Lưu kết ca
+    await pool.query(
+      'INSERT INTO shifts (shift_date, total, cash, bank) VALUES (?, ?, ?, ?)',
+      [today, total || 0, cash || 0, bank || 0]
+    );
+
+    res.json({ success: true, date: today, total, cash, bank });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi kết ca' });
+  }
+});
+
+// Lấy lịch sử kết ca (GET /api/shifts)
+app.get('/api/shifts', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM shifts ORDER BY shift_date DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi truy vấn kết ca' });
+  }
+});
+
+// Lấy tổng kết ca theo tháng/quý/năm
+app.get('/api/shifts/summary', async (req, res) => {
+  try {
+    // Theo tháng
+    const [byMonth] = await pool.query(`
+      SELECT 
+        YEAR(shift_date) as year, 
+        MONTH(shift_date) as month, 
+        SUM(total) as total
+      FROM shifts
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
+    `);
+
+    // Theo quý
+    const [byQuarter] = await pool.query(`
+      SELECT 
+        YEAR(shift_date) as year, 
+        QUARTER(shift_date) as quarter, 
+        SUM(total) as total
+      FROM shifts
+      GROUP BY year, quarter
+      ORDER BY year DESC, quarter DESC
+    `);
+
+    // Theo năm
+    const [byYear] = await pool.query(`
+      SELECT 
+        YEAR(shift_date) as year, 
+        SUM(total) as total
+      FROM shifts
+      GROUP BY year
+      ORDER BY year DESC
+    `);
+
+    res.json({ byMonth, byQuarter, byYear });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi truy vấn tổng kết ca' });
+  }
+});
+
+// ==========================
+// TỰ ĐỘNG KẾT CA LÚC 00:01 (giờ server +7)
+// ==========================
+const cron = require('node-cron');
+cron.schedule('1 0 * * *', async () => {
+  try {
+    const now = new Date();
+    const vnDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const today = vnDate.toISOString().slice(0, 10);
+
+    // Nếu chưa kết ca thì tự động kết ca
+    const [exist] = await pool.query('SELECT * FROM shifts WHERE shift_date = ?', [today]);
+    if (exist.length === 0) {
+      // Tính tổng doanh thu hôm nay
+      const [rows] = await pool.query(
+        `SELECT 
+          SUM(total) as total,
+          SUM(CASE WHEN method='cash' OR method='tiền mặt' THEN total ELSE 0 END) as cash,
+          SUM(CASE WHEN method='bank' OR method='chuyển khoản' THEN total ELSE 0 END) as bank
+        FROM payments
+        WHERE DATE(time) = ?`, [today]
+      );
+      const { total = 0, cash = 0, bank = 0 } = rows[0] || {};
+
+      await pool.query(
+        'INSERT INTO shifts (shift_date, total, cash, bank) VALUES (?, ?, ?, ?)',
+        [today, total || 0, cash || 0, bank || 0]
+      );
+      console.log(`[AUTO SHIFT] Đã tự động kết ca ngày ${today}`);
+    }
+  } catch (err) {
+    console.error('[AUTO SHIFT] Lỗi tự động kết ca:', err);
+  }
+});
+
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
