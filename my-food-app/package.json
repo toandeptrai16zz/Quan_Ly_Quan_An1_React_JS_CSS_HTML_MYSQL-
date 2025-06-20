@@ -1,0 +1,16 @@
+{
+  "name": "my-food-app",
+  "version": "1.0.0",
+  "description": "Đây là ứng dụng web quản lý gọi món ăn và đồ uống cho quán trà sữa & mì cay. Ứng dụng gồm hai phần: client (giao diện người dùng) và server (máy chủ API).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm start --prefix server\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

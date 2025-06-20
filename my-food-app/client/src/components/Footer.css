@@ -1,0 +1,21 @@
+.footer {
+    background: #34393e;
+    color: #fff;
+    text-align: center;
+    padding: 16px 0;
+    /* Giảm padding để footer nhỏ lại */
+    font-size: 16px;
+    margin-top: 32px;
+}
+
+.footer-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.footer-content a {
+    color: #ffb6c1;
+    margin: 0 10px;
+    text-decoration: none;
+    font-weight: 500;
+}

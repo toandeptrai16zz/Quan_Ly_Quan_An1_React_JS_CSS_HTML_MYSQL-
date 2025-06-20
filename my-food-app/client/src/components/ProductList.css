@@ -1,0 +1,183 @@
+.menu-toolbar {
+    display: flex;
+    align-items: center;
+    /* justify-content: center; Xóa để dễ căn chỉnh */
+    gap: 16px;
+    /* Giảm gap một chút */
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.menu-search-bar {
+    flex-grow: 1;
+    /* Cho phép thanh tìm kiếm co giãn */
+}
+
+.menu-search-bar input {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1.5px solid #ccc;
+    font-size: 1rem;
+    outline: none;
+    transition: border 0.2s;
+    width: 100%;
+    /* Sửa thành 100% để linh hoạt */
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px #0001;
+}
+
+.menu-search-bar input:focus {
+    border: 1.5px solid #1976d2;
+}
+
+.menu-tabs {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    /* Cho phép xuống hàng trên màn hình nhỏ */
+    margin-bottom: 16px;
+}
+
+.menu-tab-btn {
+    padding: 8px 22px;
+    border-radius: 20px;
+    /* Bo tròn hơn cho đẹp */
+    border: 1.5px solid #ddd;
+    background: #f8f9fa;
+    color: #333;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.menu-tab-btn:hover {
+    background: #e9ecef;
+    border-color: #ccc;
+}
+
+.menu-tab-btn.active {
+    background: #1976d2;
+    color: #fff;
+    box-shadow: 0 4px 16px #1976d233;
+    border-color: #1976d2;
+}
+
+/* ==================================================== */
+/* PHẦN BỔ SUNG CHO LAYOUT LƯỚI VÀ CÁC THÀNH PHẦN KHÁC */
+/* ==================================================== */
+
+/* Container cho phần cuộn */
+.product-list-container {
+    flex: 1;
+    /* Quan trọng: chiếm hết không gian còn lại */
+    overflow-y: auto;
+    /* Bật cuộn cho riêng khu vực này */
+    min-height: 0;
+    /* Cần thiết cho flexbox hoạt động đúng */
+    padding: 8px;
+}
+
+/* Layout dạng lưới */
+.product-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    /* FIX: Tách gap ra để rõ ràng và thêm align-content */
+    column-gap: 24px;
+    /* Khoảng cách giữa các cột */
+    row-gap: 24px;
+    /* Khoảng cách giữa các hàng */
+    align-content: start;
+    /* QUAN TRỌNG: Sửa lỗi các hàng dính vào nhau */
+}
+
+/* Nút quản lý và thêm sản phẩm */
+.manage-btn,
+.add-product-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    color: white;
+    transition: background-color 0.2s;
+}
+
+.manage-btn {
+    background-color: #6c757d;
+}
+
+.manage-btn:hover {
+    background-color: #5a6268;
+}
+
+.add-product-btn {
+    background-color: #28a745;
+}
+
+.add-product-btn:hover {
+    background-color: #218838;
+}
+
+/* Form thêm/sửa */
+.product-form {
+    background: #f8f9fa;
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid #dee2e6;
+    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.product-form h3 {
+    text-align: center;
+    margin: 0 0 12px 0;
+}
+
+.product-form input,
+.product-form textarea,
+.product-form select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.form-actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.save-btn {
+    background: #1976d2;
+    color: white;
+}
+
+.cancel-btn {
+    background: #e9ecef;
+    color: #333;
+}
+
+/* Thông báo khi không có sản phẩm */
+.no-products-message {
+    grid-column: 1 / -1;
+    /* Trải dài hết các cột */
+    text-align: center;
+    padding: 48px;
+    color: #888;
+    font-size: 1.2rem;
+}
