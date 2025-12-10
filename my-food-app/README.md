@@ -1,6 +1,6 @@
 # My Food App
 
-Đây là ứng dụng web quản lý gọi món ăn và đồ uống cho quán trà sữa & mì cay. Ứng dụng gồm hai phần: **client** (giao diện người dùng) và **server** (máy chủ API).
+Đây là ứng dụng web quản lý gọi món ăn và đồ uống cho quán trà sữa & mì cay. Ứng dụng gồm hai phần chính: **client** (giao diện người dùng) và **server** (máy chủ API).
 
 ## Cấu trúc thư mục
 
@@ -43,8 +43,9 @@ npm install
 
 **Server:**
 ```bash
-cd ../server
-npm install
+cd server
+npm install express mysql2 cors body-parser pdfkit
+
 ```
 
 ### 2. Khởi động MySQL và tạo database
@@ -81,12 +82,12 @@ Mở trình duyệt và vào địa chỉ:
 
 ## Tính năng chính
 
-- Xem thực đơn món ăn, đồ uống
-- Gọi món cho từng bàn hoặc đơn mang về
 - Quản lý lịch sử đơn hàng
 - Thêm, sửa, xóa sản phẩm (qua API)
 - Giao diện thân thiện, dễ sử dụng
-
+#Chạy dự án
+- cd my-food-app
+npm run dev
 ## Giấy phép
 
 Dự án sử dụng giấy phép MIT.

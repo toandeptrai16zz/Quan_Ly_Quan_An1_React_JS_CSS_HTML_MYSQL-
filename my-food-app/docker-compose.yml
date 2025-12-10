@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # 1. Database MySQL
+  db:
+    image: mysql:8.0
+    container_name: food_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: "my_food_app"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - food-network
+
+  # 2. Backend Node.js
+  backend:
+    build: ./server
+    container_name: food_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=123456
+      - DB_NAME=my_food_app
+      - DB_PORT=3306
+    depends_on:
+      - db
+    networks:
+      - food-network
+
+  # 3. Frontend React (Nginx)
+  frontend:
+    build: ./client
+    container_name: food_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - food-network
+
+volumes:
+  db_data:
+
+networks:
+  food-network:
+    driver: bridge

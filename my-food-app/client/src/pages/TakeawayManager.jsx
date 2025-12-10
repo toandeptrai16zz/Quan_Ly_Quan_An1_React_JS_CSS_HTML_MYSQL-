@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useReactToPrint } from "react-to-print";
 import ProductList from "../components/ProductList";
 import SuccessNotification from "../components/SuccessNotification";
+import Bill from "../components/Bill";
+import KitchenTicket from "../components/KitchenTicket"; // Import in tem
 
 const STORAGE_KEY = "takeaways_data";
 const INITIAL_TAKEAWAYS = Array.from({ length: 10 }, (_, i) => ({
@@ -19,14 +22,14 @@ function calculateTotalWithFee(orders) {
     return orders.reduce((total, item) => {
         let itemTotal = (item.price || 0) * item.quantity;
         if (isMiCay(item.name)) {
-            itemTotal += 3000 * item.quantity;
+            itemTotal += 2000 * item.quantity;
         }
         return total + itemTotal;
     }, 0);
 }
 
 const TakeawayManager = () => {
-    const [showSuccess, setShowSuccess] = useState(false); // Đặt ở đây!
+    const [showSuccess, setShowSuccess] = useState(false);
     const [takeaways, setTakeaways] = useState(() => {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
@@ -40,6 +43,13 @@ const TakeawayManager = () => {
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [tab, setTab] = useState("order");
     const [customerCash, setCustomerCash] = useState("");
+
+    // ✅ Refs cho in ấn
+    const billRef = useRef();
+    const ticketRef = useRef();
+
+    const [printOrder, setPrintOrder] = useState(null);
+    const [stickersToPrint, setStickersToPrint] = useState([]); // State lưu danh sách tem cần in
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(takeaways));
@@ -89,6 +99,7 @@ const TakeawayManager = () => {
                                 quantity: Number(quantity),
                                 note,
                                 size,
+                                category: product.category // Lưu category để lọc in tem
                             },
                         ],
                     };
@@ -111,75 +122,78 @@ const TakeawayManager = () => {
         [selectedOrderId]
     );
 
-    // ===================================================================
-    // FIX: Sửa hàm handlePay để gọi API trước khi cập nhật localStorage
-    // ===================================================================
     const handlePay = useCallback(async () => {
-        if (!selectedOrder) {
-            alert("Lỗi: Không tìm thấy đơn hàng được chọn.");
-            return;
-        }
-
-        const paymentData = {
-            order_type: "takeaway",
-            order_id: `Đơn mang về ${selectedOrder.id}`,
-            orders: selectedOrder.orders,
-            total: totalAmount,
-            method: paymentMethod,
-        };
+        if (!selectedOrder) return;
 
         try {
-            // Nhờ có proxy trong vite.config.js, ta chỉ cần dùng /api
+            const payloadData = {
+                order_type: 'takeaway',
+                order_id: selectedOrder.id,
+                orders: selectedOrder.orders,
+                total: totalAmount,
+                methodId: paymentMethod
+            };
+
             const response = await fetch('/api/payments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(paymentData),
+                body: JSON.stringify(payloadData)
             });
 
             if (!response.ok) {
-                const errorResult = await response.json();
-                throw new Error(errorResult.error || "Server đã từ chối yêu cầu.");
+                throw new Error(`Server error`);
             }
 
-            console.log("Thanh toán thành công, đã lưu vào database.");
-
-            setTakeaways((prevTakeaways) =>
-                prevTakeaways
-                    .map((t) =>
-                        t.id === selectedOrderId
-                            ? {
-                                ...t,
-                                history: [
-                                    ...t.history,
-                                    {
-                                        orders: t.orders,
-                                        total: totalAmount,
-                                        method: paymentMethod,
-                                        time: new Date().toISOString(),
-                                    },
-                                ],
-                                orders: [],
-                            }
-                            : t
-                    )
-                    .filter(
-                        (t) => !(t.id === selectedOrderId && t.orders.length === 0 && t.history.length > 0)
-                    )
+            setTakeaways(prev =>
+                prev.map(t =>
+                    t.id === selectedOrderId
+                        ? {
+                            ...t,
+                            history: [...t.history, {
+                                orders: t.orders,
+                                total: totalAmount,
+                                method: paymentMethod,
+                                time: new Date().toISOString()
+                            }],
+                            orders: []
+                        }
+                        : t
+                )
             );
 
             setShowPayment(false);
-            setSelectedOrderId(null); // Đúng tên biến!
-            setPaymentMethod("cash");
-            setCustomerCash("");
+            setSelectedOrderId(null);
             setShowSuccess(true);
-
-        } catch (error) {
-            console.error('Lỗi khi thực hiện thanh toán:', error);
-            alert(`Thanh toán thất bại: ${error.message}`);
+            setPaymentMethod('cash');
+            setCustomerCash('');
+        } catch (err) {
+            console.error('Lỗi thanh toán:', err);
+            alert('Thanh toán thất bại:\n' + err.message);
         }
     }, [selectedOrderId, paymentMethod, selectedOrder, totalAmount]);
 
-    // --- Toàn bộ phần JSX còn lại giữ nguyên ---
+    // ✅ Cấu hình in Hóa đơn
+    const handlePrintBill = useReactToPrint({
+        content: () => billRef.current,
+        documentTitle: `Bill_Takeaway_${printOrder?.table || ''}_${Date.now()}`,
+        onAfterPrint: () => setPrintOrder(null),
+    });
+
+    // ✅ Cấu hình in Tem (Stickers)
+    const handlePrintStickers = useReactToPrint({
+        content: () => ticketRef.current,
+        onAfterPrint: () => setStickersToPrint([]),
+    });
+
+    // Tự động kích hoạt in khi có dữ liệu
+    React.useEffect(() => {
+        if (printOrder) handlePrintBill();
+    }, [printOrder]);
+
+    React.useEffect(() => {
+        if (stickersToPrint.length > 0) handlePrintStickers();
+    }, [stickersToPrint]);
+
     return (
         <div style={{ maxWidth: 1400, margin: "32px auto", padding: 24 }}>
             <h2 style={{ textAlign: "center", marginBottom: 32 }}>
@@ -216,7 +230,6 @@ const TakeawayManager = () => {
                 <div
                     onClick={() => {
                         setTakeaways(prev => {
-                            // Nếu không còn đơn nào, reset id về 1
                             const newId = prev.length === 0 ? 1 : (prev[prev.length - 1].id + 1);
                             return [...prev, { id: newId, orders: [], history: [] }];
                         });
@@ -256,14 +269,14 @@ const TakeawayManager = () => {
                                             <table style={{ width: "100%", borderCollapse: "collapse", }}>
                                                 <tbody>
                                                     {selectedOrder.orders.map((item, idx) => {
-                                                        const itemTotal = item.price * item.quantity + (isMiCay(item.name) ? 3000 * item.quantity : 0);
+                                                        const itemTotal = item.price * item.quantity + (isMiCay(item.name) ? 2000 * item.quantity : 0);
                                                         return (
                                                             <tr key={idx} style={{ borderBottom: "1px solid #eee", }}>
                                                                 <td style={{ padding: "8px 4px" }}>
                                                                     {item.name}
                                                                     {item.size && (<span style={{ color: "#1976d2", fontWeight: 600, }}>{" "}({item.size})</span>)}
                                                                     {item.note && (<div style={{ fontSize: 12, color: "#777", }}>Ghi chú: {item.note}</div>)}
-                                                                    {isMiCay(item.name) && (<div style={{ color: "#e91e63", fontSize: 12, }}>+ Phụ phí{" "}{3000 * item.quantity}đ</div>)}
+                                                                    {isMiCay(item.name) && (<div style={{ color: "#e91e63", fontSize: 12, }}>+ Phụ phí{" "}{2000 * item.quantity}đ</div>)}
                                                                 </td>
                                                                 <td style={{ textAlign: "center", padding: "8px 4px", }}>x{item.quantity}</td>
                                                                 <td style={{ textAlign: "right", whiteSpace: "nowrap", padding: "8px 4px", }}>{itemTotal.toLocaleString()}đ</td>
@@ -294,56 +307,160 @@ const TakeawayManager = () => {
                     </div>
                 </div>
             )}
+
+            {/* ✅ FORM THANH TOÁN "SIÊU TO KHỔNG LỒ" (CÓ NÚT IN TEM) */}
             {showPayment && selectedOrder && (
-                <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.25)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", minWidth: 320, boxShadow: "0 4px 32px #0002", textAlign: "center", position: "relative" }}>
-                        <button onClick={() => { setShowPayment(false); setCustomerCash(""); }} style={{ position: "absolute", top: 12, right: 16, background: "#eee", border: "none", borderRadius: 8, padding: "4px 12px", cursor: "pointer", }}>Đóng</button>
-                        <h3>Chọn phương thức thanh toán cho Đơn mang về {selectedOrder.id}</h3>
-                        <div style={{ display: "flex", gap: 32, justifyContent: "center", margin: "24px 0" }}>
-                            <label style={{ fontWeight: paymentMethod === "cash" ? 700 : 400, color: paymentMethod === "cash" ? "#1976d2" : "#333", cursor: "pointer" }}>
-                                <input type="radio" name="payment" value="cash" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} style={{ accentColor: "#1976d2", marginRight: 8 }} /> Tiền mặt
+                <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
+                    <div style={{
+                        background: "#fff", borderRadius: 20, padding: "40px",
+                        width: "600px", maxWidth: "95vw", // ✅ Tăng độ rộng lên 600px
+                        boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+                        textAlign: "center", position: "relative",
+                        display: 'flex', flexDirection: 'column'
+                    }}>
+                        <button onClick={() => { setShowPayment(false); setCustomerCash(""); }} style={{ position: "absolute", top: 16, right: 16, background: "#f5f5f5", border: "none", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", fontSize: 18, fontWeight: 'bold', color: '#555' }}>✕</button>
+
+                        <h2 style={{ margin: "0 0 30px 0", color: "#333", fontSize: "1.5rem" }}>
+                            Thanh toán Đơn {selectedOrder.id}
+                        </h2>
+
+                        {/* CHỌN PHƯƠNG THỨC */}
+                        <div style={{ display: "flex", gap: 20, justifyContent: "center", marginBottom: 30 }}>
+                            <label style={{
+                                flex: 1, padding: "15px", borderRadius: 12, cursor: "pointer", border: "2px solid",
+                                borderColor: paymentMethod === "cash" ? "#1976d2" : "#eee",
+                                background: paymentMethod === "cash" ? "#e3f2fd" : "#fff",
+                                color: paymentMethod === "cash" ? "#1976d2" : "#555",
+                                fontWeight: "bold", fontSize: "1.1rem", transition: "all 0.2s"
+                            }}>
+                                <input type="radio" name="payment" value="cash" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} style={{ display: "none" }} />
+                                💵 Tiền mặt
                             </label>
-                            <label style={{ fontWeight: paymentMethod === "bank" ? 700 : 400, color: paymentMethod === "bank" ? "#1976d2" : "#333", cursor: "pointer" }}>
-                                <input type="radio" name="payment" value="bank" checked={paymentMethod === "bank"} onChange={() => setPaymentMethod("bank")} style={{ accentColor: "#1976d2", marginRight: 8 }} /> Chuyển khoản
+                            <label style={{
+                                flex: 1, padding: "15px", borderRadius: 12, cursor: "pointer", border: "2px solid",
+                                borderColor: paymentMethod === "bank" ? "#1976d2" : "#eee",
+                                background: paymentMethod === "bank" ? "#e3f2fd" : "#fff",
+                                color: paymentMethod === "bank" ? "#1976d2" : "#555",
+                                fontWeight: "bold", fontSize: "1.1rem", transition: "all 0.2s"
+                            }}>
+                                <input type="radio" name="payment" value="bank" checked={paymentMethod === "bank"} onChange={() => setPaymentMethod("bank")} style={{ display: "none" }} />
+                                🏦 Chuyển khoản
                             </label>
                         </div>
+
+                        {/* SỐ TIỀN CẦN THANH TOÁN */}
+                        <div style={{ background: "#fafafa", borderRadius: 16, padding: "20px", marginBottom: 20 }}>
+                            <div style={{ fontSize: "1.1rem", color: "#666", marginBottom: 8 }}>Tổng tiền phải thu:</div>
+                            <div style={{ fontSize: "3rem", fontWeight: "900", color: "#1976d2", lineHeight: 1 }}>
+                                {totalAmount.toLocaleString()}đ
+                            </div>
+                        </div>
+
                         {paymentMethod === "cash" && (
-                            <div style={{ margin: "18px 0 24px 0" }}>
-                                <div style={{ marginBottom: 10 }}><b>Số tiền cần thanh toán:</b><span style={{ color: "#1976d2", fontWeight: 700 }}> {totalAmount.toLocaleString()}đ</span></div>
-                                <div style={{ marginBottom: 10 }}>
-                                    <label><b>Tiền khách đưa:</b>
-                                        <input type="number" min={0} value={customerCash} onChange={e => setCustomerCash(e.target.value)} style={{ width: 120, padding: 6, borderRadius: 6, border: "1px solid #ccc" }} placeholder="Nhập số tiền" /> đ
-                                    </label>
+                            <div style={{ animation: "fadeIn 0.3s" }}>
+                                <div style={{ marginBottom: 20 }}>
+                                    <label style={{ display: "block", fontSize: "1.1rem", marginBottom: 10, fontWeight: "600" }}>Tiền khách đưa:</label>
+                                    <input
+                                        type="number" min={0}
+                                        value={customerCash}
+                                        onChange={e => setCustomerCash(e.target.value)}
+                                        style={{
+                                            width: "100%", padding: "16px", borderRadius: 12,
+                                            border: "2px solid #ccc", fontSize: "2rem", fontWeight: "bold",
+                                            textAlign: "center", color: "#333", boxSizing: "border-box"
+                                        }}
+                                        placeholder="0"
+                                        autoFocus
+                                    />
                                 </div>
-                                <div><b>Tiền thừa:</b><span style={{ color: change < 0 ? "#e91e63" : "#388e3c", fontWeight: 700 }}>{customerCash !== "" ? (change >= 0 ? change.toLocaleString() : 0) : 0}đ</span>
-                                    {customerCash !== "" && change < 0 && (<span style={{ color: "#e91e63", marginLeft: 8 }}>(Khách đưa thiếu)</span>)}
+                                <div style={{ fontSize: "1.2rem", display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
+                                    <span>Tiền thừa trả khách:</span>
+                                    <span style={{
+                                        fontSize: "2rem", fontWeight: "bold",
+                                        color: change < 0 ? "#e91e63" : "#2e7d32"
+                                    }}>
+                                        {customerCash !== "" ? (change >= 0 ? change.toLocaleString() : "Thiếu tiền") : "0"}đ
+                                    </span>
                                 </div>
                             </div>
                         )}
+
                         {paymentMethod === "bank" && (
-                            <div style={{ margin: "18px 0 24px 0", background: "#f8f8ff", borderRadius: 12, padding: 18, textAlign: "center", border: "1.5px solid #1976d2" }}>
-                                <h4 style={{ margin: "0 0 10px 0" }}>Thông tin chuyển khoản</h4>
-                                <div style={{ marginBottom: 8 }}>
-                                    <b>Ngân hàng:</b> Techcombank<br />
-                                    <b>Số tài khoản:</b> 150220046789<br />
-                                    <b>Tên:</b> HA QUANG CHUONG<br />
-                                    <b>Số tiền:</b><span style={{ color: "#e91e63", fontWeight: 700 }}> {totalAmount.toLocaleString()}đ</span><br />
-                                    <b>Nội dung:</b> TAKEAWAY{selectedOrder.id}
+                            <div style={{ animation: "fadeIn 0.3s", display: "flex", gap: 20, alignItems: "center", textAlign: "left", background: "#f8f9fa", padding: 20, borderRadius: 16 }}>
+                                <img
+                                    src={`https://img.vietqr.io/image/970407-5061989666-compact2.jpg?amount=${totalAmount}&addInfo=TAKEAWAY${selectedOrder.id}`}
+                                    alt="QR"
+                                    style={{ width: 160, height: 160, borderRadius: 12, border: "2px solid #1976d2" }}
+                                />
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: "1.1rem", marginBottom: 6 }}><b>Techcombank</b></div>
+                                    <div style={{ fontSize: "1.3rem", fontWeight: "bold", color: "#333", marginBottom: 6, letterSpacing: 1 }}>5061989666</div>
+                                    <div style={{ fontSize: "1.1rem", marginBottom: 12 }}>HA THI NINH</div>
+                                    <div style={{ fontSize: "0.9rem", color: "#666", fontStyle: "italic" }}>* Khách quét mã để thanh toán chính xác số tiền.</div>
                                 </div>
-                                <div style={{ marginTop: 8 }}>
-                                    <img src={`https://img.vietqr.io/image/970407-150220046789-compact2.jpg?amount=${totalAmount}&addInfo=TAKEAWAY${selectedOrder.id}`} alt="QR chuyển khoản" style={{ width: 180, height: 180, borderRadius: 12, border: "2px solid #1976d2" }} />
-                                </div>
-                                <div style={{ color: "#888", fontSize: 13, marginTop: 8 }}>Quét mã QR bằng app ngân hàng để chuyển khoản nhanh!</div>
                             </div>
                         )}
-                        <button
-                            onClick={handlePay}
-                            style={{ background: "linear-gradient(90deg, #1976d2 60%, #e91e63 100%)", color: "#fff", border: "none", borderRadius: 10, padding: "12px 32px", fontSize: "1.1rem", fontWeight: 600, cursor: "pointer", opacity: paymentMethod === 'cash' && (customerCash === '' || change < 0) ? 0.5 : 1 }}
-                            disabled={paymentMethod === "cash" && (customerCash === "" || Number(customerCash) < totalAmount)}>Xác nhận thanh toán</button>
-                        <button onClick={() => { setShowPayment(false); setCustomerCash(""); }} style={{ background: "#eee", color: "#333", border: "none", borderRadius: 8, padding: "10px 22px", fontSize: "1rem", fontWeight: 500, cursor: "pointer", marginLeft: 18 }}>Hủy</button>
+
+                        <div style={{ display: 'flex', gap: 16, marginTop: 40 }}>
+                            {/* ✅ NÚT IN TEM LY - CÓ LOGIC LỌC ĐỒ UỐNG */}
+                            <button
+                                onClick={() => {
+                                    const DRINK_CATEGORIES = ["Trà Sữa", "Nước Ép", "Đồ Uống Khác", "Topping thêm"];
+
+                                    const drinksOnly = selectedOrder.orders.filter(item => {
+                                        // 1. Check Size (Nước thường có size)
+                                        if (item.size) return true;
+
+                                        // 2. Check danh mục
+                                        if (item.category && DRINK_CATEGORIES.includes(item.category)) return true;
+
+                                        // 3. Check tên
+                                        const name = item.name.toLowerCase();
+                                        if (name.includes("trà") || name.includes("sữa") || name.includes("nước") || name.includes("ép")) return true;
+
+                                        return false;
+                                    });
+
+                                    if (drinksOnly.length === 0) {
+                                        alert("Đơn này không có đồ uống nào để in tem!");
+                                        return;
+                                    }
+
+                                    setStickersToPrint(drinksOnly);
+                                }}
+                                style={{ flex: 1, background: "#ff9800", color: "#fff", border: "none", borderRadius: 12, padding: "16px", fontSize: "1.1rem", fontWeight: 700, cursor: "pointer", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                            >
+                                🏷️ In Tem Ly
+                            </button>
+
+                            <button
+                                onClick={async () => {
+                                    await handlePay();
+                                    setPrintOrder({ table: `Mang về ${selectedOrder.id}`, items: selectedOrder.orders, total: totalAmount, createdAt: new Date() });
+                                }}
+                                style={{ flex: 2, background: "linear-gradient(90deg, #1976d2, #1565c0)", color: "#fff", border: "none", borderRadius: 12, padding: "16px", fontSize: "1.1rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(25, 118, 210, 0.3)" }}
+                                disabled={paymentMethod === "cash" && (customerCash === "" || Number(customerCash) < totalAmount)}
+                            >
+                                🖨️ TT & In Bill
+                            </button>
+                            <button
+                                onClick={handlePay}
+                                style={{ flex: 1, background: "#eee", color: "#333", border: "none", borderRadius: 12, padding: "16px", fontSize: "1.1rem", fontWeight: 600, cursor: "pointer" }}
+                                disabled={paymentMethod === "cash" && (customerCash === "" || Number(customerCash) < totalAmount)}
+                            >
+                                Không in
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
+
+            {/* ✅ KHU VỰC ẨN ĐỂ IN */}
+            <div style={{ display: 'none' }}>
+                <KitchenTicket ref={ticketRef} items={stickersToPrint} orderInfo={`Mang về - Đơn ${selectedOrder?.id}`} />
+                <Bill ref={billRef} order={printOrder} />
+            </div>
+
             {showSuccess && (
                 <SuccessNotification onClose={() => setShowSuccess(false)} />
             )}

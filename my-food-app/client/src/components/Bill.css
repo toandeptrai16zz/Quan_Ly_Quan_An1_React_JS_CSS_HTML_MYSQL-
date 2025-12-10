@@ -1,0 +1,40 @@
+.bill-container {
+  font-family: monospace;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0001;
+  margin: 0 auto;
+  padding: 16px;
+  width: 300px;
+}
+
+.bill-container h2 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+
+.bill-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bill-container th, .bill-container td {
+  padding: 4px 0;
+}
+
+.bill-container th {
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.bill-container td {
+  font-size: 13px;
+}
+
+.bill-container hr {
+  border: none;
+  border-top: 1px dashed #bbb;
+  margin: 8px 0;
+} 
