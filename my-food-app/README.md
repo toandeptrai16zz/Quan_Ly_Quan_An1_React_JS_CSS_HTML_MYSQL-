@@ -40,6 +40,7 @@ Hệ thống quản lý bán hàng (POS) chuyên nghiệp dành cho quán Trà S
 ---
 
 ## 3. CẤU TRÚC DỰ ÁN
+```bash
 my-food-app/
 ├── client/
 │   ├── public/
@@ -106,7 +107,7 @@ my-food-app/
 ├── docker-compose.yml
 ├── package.json
 └── README.md
----
+```
 
 ## 4. HƯỚNG DẪN CÀI ĐẶT
 
